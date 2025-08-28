@@ -80,4 +80,15 @@ cython_debug/
 *.env
 *.local
 
+# Node.js dependencies (not needed for static site)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Development files
+*.tmp
+*.temp
+.DS_Store
+
 install_ngork.sh

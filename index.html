@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>✨ Twinkle Eval Analyzer</title>
+    <link rel="stylesheet" href="style.css">
+
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⭐</text></svg>">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>✨ Twinkle Eval Analyzer (.json / .jsonl)</h1>
+        </header>
+        
+        <div class="app-layout">
+            <!-- Sidebar -->
+            <aside class="sidebar">
+                <div class="upload-section">
+                    <label for="file-input" class="upload-label">選擇 Twinkle Eval 檔案</label>
+                    <input type="file" id="file-input" multiple accept=".json,.jsonl" class="file-input">
+                    <div id="file-status" class="file-status"></div>
+                </div>
+                
+                <div class="controls" id="controls" style="display: none;">
+                    <div class="control-group">
+                        <label>
+                            <input type="checkbox" id="normalize-checkbox"> 以 0–100 顯示
+                        </label>
+                    </div>
+                    
+                    <div class="control-group">
+                        <label for="page-size">每張圖顯示幾個類別</label>
+                        <select id="page-size">
+                            <option value="10">10</option>
+                            <option value="20" selected>20</option>
+                            <option value="30">30</option>
+                            <option value="50">50</option>
+                            <option value="100">100</option>
+                        </select>
+                    </div>
+                    
+                    <div class="control-group">
+                        <label for="sort-mode">排序方式</label>
+                        <select id="sort-mode">
+                            <option value="desc">依整體平均由高到低</option>
+                            <option value="asc">依整體平均由低到高</option>
+                            <option value="alpha">依字母排序</option>
+                        </select>
+                    </div>
+                    
+                    <div class="control-group">
+                        <label for="dataset-select">選擇資料集</label>
+                        <select id="dataset-select"></select>
+                    </div>
+                </div>
+            </aside>
+            
+            <!-- Main Content -->
+            <main class="main-content">
+                <div id="loading" class="loading" style="display: none;">
+                    <div class="spinner"></div>
+                    <p>處理檔案中...</p>
+                </div>
+                
+                <div id="error-message" class="error-message" style="display: none;"></div>
+                
+                <div id="initial-message" class="info-message">
+                    <p>請上傳 Twinkle Eval 檔案</p>
+                </div>
+                
+                <div id="content-area" class="content-area" style="display: none;">
+                    <div id="charts-container"></div>
+                </div>
+            </main>
+        </div>
+    </div>
+    
+    <script src="script.js"></script>
+</body>
+</html>
