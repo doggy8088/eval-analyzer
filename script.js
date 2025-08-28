@@ -176,9 +176,14 @@ function extractRecords(doc) {
     for (const [dsPath, dsPayload] of Object.entries(doc.dataset_results || {})) {
         if (typeof dsPayload !== 'object' || dsPayload === null) continue;
         
-        const dsName = dsPath.startsWith('datasets/') 
+        let dsName = dsPath.startsWith('datasets/') 
             ? dsPath.split('datasets/')[1].replace(/^\/+|\/+$/g, '') 
             : dsPath;
+        
+        // If dsName is empty after processing, use a default name
+        if (!dsName) {
+            dsName = dsPath || 'default_dataset';
+        }
             
         let avgMeta = dsPayload.average_accuracy;
         const results = dsPayload.results || [];
