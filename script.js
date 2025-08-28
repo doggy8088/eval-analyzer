@@ -16,6 +16,8 @@ const normalizeCheckbox = document.getElementById('normalize-checkbox');
 const pageSizeSelect = document.getElementById('page-size');
 const sortModeSelect = document.getElementById('sort-mode');
 const chartsContainer = document.getElementById('charts-container');
+const toolbar = document.getElementById('toolbar');
+const downloadsContainer = document.getElementById('downloads-container');
 
 // Initialize the app
 document.addEventListener('DOMContentLoaded', function() {
@@ -297,7 +299,7 @@ function renderCurrentDataset() {
     const totalPages = Math.ceil(totalCategories / pageSize);
     
     chartsContainer.innerHTML = '';
-    
+    const pagesMeta = [];
     for (let page = 0; page < totalPages; page++) {
         const startIdx = page * pageSize;
         const endIdx = Math.min(startIdx + pageSize, totalCategories);
@@ -305,8 +307,14 @@ function renderCurrentDataset() {
         
         const pageData = processedData.filter(item => pageCategories.includes(item.category));
         createChartSection(pageData, pageCategories, startIdx + 1, endIdx, totalCategories, normalize);
+        pagesMeta.push({
+            start: startIdx + 1,
+            end: endIdx,
+            categories: pageCategories,
+            data: pageData,
+        });
     }
-    
+    renderDownloads(pagesMeta, normalize);
     showContent();
 }
 
@@ -319,15 +327,10 @@ function createChartSection(data, categories, start, end, total, normalize) {
     
     const title = document.createElement('h3');
     title.className = 'chart-title';
-    title.textContent = `📊 ${currentDataset}｜類別 ${start}-${end} / ${total}`;
-    
-    const downloadBtn = document.createElement('button');
-    downloadBtn.className = 'download-btn';
-    downloadBtn.textContent = `下載此頁 CSV (${start}-${end})`;
-    downloadBtn.addEventListener('click', () => downloadPageCSV(data, categories, start, end));
+    // 與 Python UI 一致：標題不包含 dataset 名稱
+    title.textContent = `📊 類別 ${start}-${end} / ${total}`;
     
     header.appendChild(title);
-    header.appendChild(downloadBtn);
     
     const chartContainer = document.createElement('div');
     chartContainer.className = 'chart-container';
@@ -349,6 +352,10 @@ function createChartSection(data, categories, start, end, total, normalize) {
 function createChart(container, data, categories, normalize) {
     // Clear existing content
     container.innerHTML = '';
+    // Tooltip element
+    const tooltip = document.createElement('div');
+    tooltip.className = 'chart-tooltip';
+    container.appendChild(tooltip);
     
     // Get unique source labels
     const sourceLabels = [...new Set(data.map(item => item.sourceLabel))];
@@ -357,22 +364,28 @@ function createChart(container, data, categories, normalize) {
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svg.setAttribute('width', '100%');
     svg.setAttribute('height', '100%');
-    svg.setAttribute('viewBox', '0 0 800 400');
-    svg.style.background = 'white';
+    // 放大繪圖座標，提供更寬的右側圖例
+    svg.setAttribute('viewBox', '0 0 900 560');
+    svg.style.background = 'transparent';
     
-    const margin = { top: 20, right: 20, bottom: 80, left: 60 };
-    const chartWidth = 800 - margin.left - margin.right;
-    const chartHeight = 400 - margin.top - margin.bottom;
+    // 根據最長類別文字動態調整底部外邊距，避免與 x 軸標題重疊
+    const approxCharWidth = 6.5; // 對應 font-size 11 的估算
+    const maxCatLen = categories.reduce((m, c) => Math.max(m, (c || '').length), 0);
+    const labelSpace = Math.min(300, Math.max(40, Math.round(maxCatLen * approxCharWidth)));
+    const margin = { top: 20, right: 260, bottom: 80 + labelSpace, left: 60 };
+    const chartWidth = 900 - margin.left - margin.right;
+    const chartHeight = 560 - margin.top - margin.bottom;
     
     // Calculate data ranges
     const maxValue = Math.max(...data.map(item => item.displayValue));
-    const minValue = Math.min(...data.map(item => item.displayValue));
-    const valueRange = maxValue - minValue;
+    // 與 Python 版刻度一致：0–1 以 0.05 間距，或 0–100
+    const yMax = normalize ? 100 : Math.min(1.0, Math.ceil((maxValue || 1) / 0.05) * 0.05);
+    const ySteps = normalize ? 10 : Math.max(1, Math.round(yMax / 0.05));
     
     // Colors for different models
     const colors = [
-        '#ff4b4b', '#4b8bff', '#4bff4b', '#ffff4b', '#ff4bff', 
-        '#4bffff', '#ff8b4b', '#8b4bff', '#4bff8b', '#ffff8b'
+        '#8ab6ff', '#f6a5c0', '#9dd39c', '#ffd67f', '#cba0ff', 
+        '#88e1dd', '#ffa07f', '#b39ddb', '#7fd3ff', '#ffe6a8'
     ];
     
     // Create chart group
@@ -385,7 +398,7 @@ function createChart(container, data, categories, normalize) {
     xAxis.setAttribute('y1', chartHeight);
     xAxis.setAttribute('x2', chartWidth);
     xAxis.setAttribute('y2', chartHeight);
-    xAxis.setAttribute('stroke', '#333');
+    xAxis.setAttribute('stroke', '#4a5160');
     xAxis.setAttribute('stroke-width', 1);
     chartGroup.appendChild(xAxis);
     
@@ -394,14 +407,24 @@ function createChart(container, data, categories, normalize) {
     yAxis.setAttribute('y1', 0);
     yAxis.setAttribute('x2', 0);
     yAxis.setAttribute('y2', chartHeight);
-    yAxis.setAttribute('stroke', '#333');
+    yAxis.setAttribute('stroke', '#4a5160');
     yAxis.setAttribute('stroke-width', 1);
     chartGroup.appendChild(yAxis);
     
+    // Frame (plot area border)
+    const frame = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    frame.setAttribute('x', 0);
+    frame.setAttribute('y', 0);
+    frame.setAttribute('width', chartWidth);
+    frame.setAttribute('height', chartHeight);
+    frame.setAttribute('fill', 'none');
+    frame.setAttribute('stroke', '#2a2f3a');
+    frame.setAttribute('rx', 6);
+    chartGroup.appendChild(frame);
+    
     // Draw y-axis labels
-    const ySteps = 5;
     for (let i = 0; i <= ySteps; i++) {
-        const value = (maxValue / ySteps) * i;
+        const value = (yMax / ySteps) * i;
         const y = chartHeight - (i / ySteps) * chartHeight;
         
         const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
@@ -409,8 +432,8 @@ function createChart(container, data, categories, normalize) {
         label.setAttribute('y', y + 4);
         label.setAttribute('text-anchor', 'end');
         label.setAttribute('font-size', '12');
-        label.setAttribute('fill', '#666');
-        label.textContent = value.toFixed(2);
+        label.setAttribute('fill', '#9aa3b2');
+        label.textContent = normalize ? value.toFixed(0) : value.toFixed(2);
         chartGroup.appendChild(label);
         
         if (i > 0) {
@@ -419,7 +442,7 @@ function createChart(container, data, categories, normalize) {
             gridLine.setAttribute('y1', y);
             gridLine.setAttribute('x2', chartWidth);
             gridLine.setAttribute('y2', y);
-            gridLine.setAttribute('stroke', '#e0e0e0');
+            gridLine.setAttribute('stroke', '#2a2f3a');
             gridLine.setAttribute('stroke-width', 1);
             chartGroup.appendChild(gridLine);
         }
@@ -438,7 +461,7 @@ function createChart(container, data, categories, normalize) {
             const item = data.find(d => d.category === category && d.sourceLabel === label);
             if (!item) return;
             
-            const barHeight = (item.displayValue / maxValue) * chartHeight;
+            const barHeight = (item.displayValue / (yMax || 1)) * chartHeight;
             const barX = categoryX + labelIndex * (barWidth + barSpacing) + categoryWidth * 0.1;
             const barY = chartHeight - barHeight;
             
@@ -448,51 +471,102 @@ function createChart(container, data, categories, normalize) {
             bar.setAttribute('width', barWidth);
             bar.setAttribute('height', barHeight);
             bar.setAttribute('fill', colors[labelIndex % colors.length]);
-            bar.setAttribute('opacity', 0.8);
+            bar.setAttribute('opacity', 0.85);
             bar.setAttribute('cursor', 'pointer');
-            
-            // Add tooltip
-            const title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
-            title.textContent = `${label}\n${category}\n${item.displayValue.toFixed(3)}`;
-            bar.appendChild(title);
-            
+            // Custom hover tooltip
+            const valueText = normalize ? item.displayValue.toFixed(1) : item.displayValue.toFixed(4);
+            const showTip = (evt) => {
+                const rect = container.getBoundingClientRect();
+                const left = evt.clientX - rect.left + 14;
+                const top = evt.clientY - rect.top + 14;
+                tooltip.style.left = `${left}px`;
+                tooltip.style.top = `${top}px`;
+                tooltip.innerHTML = `
+                    <div class="row"><div class="key">source_label</div><div class="val">${label}</div></div>
+                    <div class="row"><div class="key">file</div><div class="val">${item.file}</div></div>
+                    <div class="row"><div class="key">accuracy_mean</div><div class="val">${valueText}</div></div>
+                `;
+                tooltip.style.display = 'block';
+                bar.setAttribute('opacity', 1);
+                bar.setAttribute('stroke', '#cfd6e6');
+                bar.setAttribute('stroke-width', 0.5);
+            };
+            const hideTip = () => {
+                tooltip.style.display = 'none';
+                bar.setAttribute('opacity', 0.85);
+                bar.removeAttribute('stroke');
+                bar.removeAttribute('stroke-width');
+            };
+            bar.addEventListener('mousemove', showTip);
+            bar.addEventListener('mouseenter', showTip);
+            bar.addEventListener('mouseleave', hideTip);
+
             chartGroup.appendChild(bar);
         });
         
         // Add category label
         const categoryLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-        categoryLabel.setAttribute('x', categoryX + categoryWidth / 2);
-        categoryLabel.setAttribute('y', chartHeight + 20);
-        categoryLabel.setAttribute('text-anchor', 'middle');
+        const labelX = categoryX + categoryWidth / 2;
+        const labelY = chartHeight + 18; // 與 x 軸標題保有距離
+        categoryLabel.setAttribute('x', labelX);
+        categoryLabel.setAttribute('y', labelY);
+        categoryLabel.setAttribute('text-anchor', 'end');
         categoryLabel.setAttribute('font-size', '11');
-        categoryLabel.setAttribute('fill', '#333');
-        categoryLabel.textContent = category.length > 12 ? category.substring(0, 12) + '...' : category;
+        categoryLabel.setAttribute('fill', '#cfd6e6');
+        categoryLabel.setAttribute('transform', `rotate(-90, ${labelX}, ${labelY})`);
+        categoryLabel.textContent = category;
         chartGroup.appendChild(categoryLabel);
     });
     
-    // Add legend if multiple models
-    if (sourceLabels.length > 1) {
+    // Add legend (always visible, to the right margin with card background)
+    if (sourceLabels.length >= 1) {
         const legend = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-        legend.setAttribute('transform', `translate(${chartWidth - 200}, 20)`);
+        // 放到右側外邊距，不覆蓋圖表
+        legend.setAttribute('transform', `translate(${chartWidth + 20}, 20)`);
+        
+        const legendWidth = 210;
+        const legendHeight = sourceLabels.length * 20 + 28;
+        const legendBg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        legendBg.setAttribute('x', 0);
+        legendBg.setAttribute('y', 0);
+        legendBg.setAttribute('width', legendWidth);
+        legendBg.setAttribute('height', legendHeight);
+        legendBg.setAttribute('rx', 8);
+        legendBg.setAttribute('fill', '#111624');
+        legendBg.setAttribute('stroke', '#2a2f3a');
+        legend.appendChild(legendBg);
+
+        // Title above legend
+        const legendTitle = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        legendTitle.setAttribute('x', 12);
+        legendTitle.setAttribute('y', 16);
+        legendTitle.setAttribute('font-size', '11');
+        legendTitle.setAttribute('fill', '#9aa3b2');
+        legendTitle.textContent = 'source_label';
+        legend.appendChild(legendTitle);
         
         sourceLabels.forEach((label, index) => {
             const legendItem = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-            legendItem.setAttribute('transform', `translate(0, ${index * 20})`);
+            legendItem.setAttribute('transform', `translate(12, ${28 + index * 20})`);
             
-            const legendRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-            legendRect.setAttribute('x', 0);
-            legendRect.setAttribute('y', 0);
-            legendRect.setAttribute('width', 12);
-            legendRect.setAttribute('height', 12);
-            legendRect.setAttribute('fill', colors[index % colors.length]);
-            legendItem.appendChild(legendRect);
+            const swatch = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+            swatch.setAttribute('x', 0);
+            swatch.setAttribute('y', -10);
+            swatch.setAttribute('width', 12);
+            swatch.setAttribute('height', 12);
+            swatch.setAttribute('fill', colors[index % colors.length]);
+            legendItem.appendChild(swatch);
             
             const legendText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
             legendText.setAttribute('x', 18);
-            legendText.setAttribute('y', 10);
+            legendText.setAttribute('y', 0);
             legendText.setAttribute('font-size', '11');
-            legendText.setAttribute('fill', '#333');
-            legendText.textContent = label.length > 25 ? label.substring(0, 25) + '...' : label;
+            legendText.setAttribute('fill', '#cfd6e6');
+            const short = label.length > 28 ? label.substring(0, 28) + '…' : label;
+            legendText.textContent = short;
+            const t = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+            t.textContent = label;
+            legendText.appendChild(t);
             legendItem.appendChild(legendText);
             
             legend.appendChild(legendItem);
@@ -507,18 +581,19 @@ function createChart(container, data, categories, normalize) {
     yTitle.setAttribute('y', -35);
     yTitle.setAttribute('text-anchor', 'middle');
     yTitle.setAttribute('font-size', '12');
-    yTitle.setAttribute('fill', '#333');
+    yTitle.setAttribute('fill', '#cfd6e6');
     yTitle.setAttribute('transform', `rotate(-90, -35, ${chartHeight / 2})`);
-    yTitle.textContent = normalize ? 'Accuracy (0-100)' : 'Accuracy';
+    yTitle.textContent = normalize ? 'accuracy_mean (0-100)' : 'accuracy_mean';
     chartGroup.appendChild(yTitle);
     
     const xTitle = document.createElementNS('http://www.w3.org/2000/svg', 'text');
     xTitle.setAttribute('x', chartWidth / 2);
-    xTitle.setAttribute('y', chartHeight + 60);
+    // x 軸標題動態放置在所有類別文字下方
+    xTitle.setAttribute('y', chartHeight + 40 + labelSpace);
     xTitle.setAttribute('text-anchor', 'middle');
     xTitle.setAttribute('font-size', '12');
-    xTitle.setAttribute('fill', '#333');
-    xTitle.textContent = 'Category';
+    xTitle.setAttribute('fill', '#cfd6e6');
+    xTitle.textContent = 'category';
     chartGroup.appendChild(xTitle);
     
     svg.appendChild(chartGroup);
@@ -537,7 +612,7 @@ function createDataTable(data, categories, normalize) {
     const headerRow = document.createElement('tr');
     
     const categoryHeader = document.createElement('th');
-    categoryHeader.textContent = 'Category';
+    categoryHeader.textContent = 'category';
     headerRow.appendChild(categoryHeader);
     
     sourceLabels.forEach(label => {
@@ -566,7 +641,7 @@ function createDataTable(data, categories, normalize) {
             
             const item = data.find(d => d.category === category && d.sourceLabel === label);
             if (item) {
-                cell.textContent = item.displayValue.toFixed(3);
+                cell.textContent = normalize ? item.displayValue.toFixed(1) : item.displayValue.toFixed(4);
             } else {
                 cell.textContent = '-';
             }
@@ -581,7 +656,7 @@ function createDataTable(data, categories, normalize) {
     return table;
 }
 
-function downloadPageCSV(data, categories, start, end) {
+function downloadPageCSV(data, categories, start, end, normalize) {
     const sourceLabels = [...new Set(data.map(item => item.sourceLabel))];
     
     // Create CSV content
@@ -592,7 +667,7 @@ function downloadPageCSV(data, categories, start, end) {
         const row = [category];
         sourceLabels.forEach(label => {
             const item = data.find(d => d.category === category && d.sourceLabel === label);
-            row.push(item ? item.displayValue.toFixed(3) : '');
+            row.push(item ? (normalize ? item.displayValue.toFixed(1) : item.displayValue.toFixed(4)) : '');
         });
         rows.push(row.join(','));
     });
@@ -631,6 +706,24 @@ function hideError() {
 
 function showControls() {
     controls.style.display = 'block';
+    if (toolbar) toolbar.style.display = 'flex';
+}
+
+function renderDownloads(pagesMeta, normalize) {
+    if (!downloadsContainer) return;
+    downloadsContainer.innerHTML = '';
+    if (!pagesMeta || pagesMeta.length === 0) {
+        downloadsContainer.style.display = 'none';
+        return;
+    }
+    pagesMeta.forEach(({ start, end, categories, data }) => {
+        const btn = document.createElement('button');
+        btn.className = 'download-btn';
+        btn.textContent = `下載此頁 CSV (${start}-${end})`;
+        btn.addEventListener('click', () => downloadPageCSV(data, categories, start, end, normalize));
+        downloadsContainer.appendChild(btn);
+    });
+    downloadsContainer.style.display = 'flex';
 }
 
 function hideInitialMessage() {

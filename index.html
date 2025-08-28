@@ -50,15 +50,16 @@
                         </select>
                     </div>
                     
-                    <div class="control-group">
-                        <label for="dataset-select">選擇資料集</label>
-                        <select id="dataset-select"></select>
-                    </div>
+                    <!-- dataset-select 移至主區塊的工具列，這裡不再顯示 -->
                 </div>
             </aside>
             
             <!-- Main Content -->
             <main class="main-content">
+                <div class="toolbar" id="toolbar" style="display: none;">
+                    <label for="dataset-select" class="toolbar-label">選擇資料集</label>
+                    <select id="dataset-select" class="toolbar-select"></select>
+                </div>
                 <div id="loading" class="loading" style="display: none;">
                     <div class="spinner"></div>
                     <p>處理檔案中...</p>
@@ -72,6 +73,7 @@
                 
                 <div id="content-area" class="content-area" style="display: none;">
                     <div id="charts-container"></div>
+                    <div id="downloads-container" class="downloads-section" style="display: none;"></div>
                 </div>
             </main>
         </div>
