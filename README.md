@@ -1,6 +1,6 @@
 # 🌟 Eval Analyzer
 
-一個基於 🎈 **Streamlit** 的互動式工具，用來分析 **[Twinkle Eval](https://github.com/ai-twinkle/Eval)** 格式的評估檔案（`.json` / `.jsonl`）。  
+一個基於 **Vanilla JavaScript** 的靜態網站工具，用來分析 **[Twinkle Eval](https://github.com/ai-twinkle/Eval)** 格式的評估檔案（`.json` / `.jsonl`）。  
 
 ## 📌 功能特色
 
@@ -23,21 +23,28 @@
   - 支援分頁顯示（自訂每頁顯示類別數量）。
   - 指標可切換為原始值或 0–100 比例。
 - 支援 **CSV 匯出**（下載分頁結果）。
+- **純靜態網站**，無需安裝任何依賴套件。
+- **響應式設計**，支援手機和平板瀏覽。
 
 ## 🚀 使用方式
 
-### 1. 安裝環境
-建議使用虛擬環境（如 `venv` 或 `conda`）：
+### 1. 開啟網站
+直接在瀏覽器中開啟 `index.html` 檔案，或將檔案放在 Web 伺服器上使用。
+
+若要在本地端測試，可以使用任何 HTTP 伺服器：
 
 ```bash
-pip install -r requirements.txt
-```
-### 2. 啟動應用程式
-```bash
-streamlit run app.py
+# 使用 Python
+python -m http.server 8000
+
+# 使用 Node.js
+npx serve .
+
+# 使用 PHP
+php -S localhost:8000
 ```
 
-### 3. 操作流程
+### 2. 操作流程
 1. 在左側 Sidebar 上傳一個或多個 **Twinkle Eval 檔案**。
 2. 選擇要查看的資料集。
 3. 設定排序方式、分頁大小、顯示比例（0–1 或 0–100）。
@@ -76,6 +83,14 @@ streamlit run app.py
 - **圖表**：顯示各模型在不同類別的 accuracy_mean 比較。
 - **表格**：Pivot Table，行為類別，列為模型，值為 accuracy。
 - **下載**：每頁結果可匯出成 CSV。
+
+## 🔧 技術實作
+
+- **前端技術**：Vanilla JavaScript + HTML5 + CSS3
+- **圖表庫**：Chart.js
+- **檔案處理**：FileReader API
+- **資料處理**：原生 JavaScript（無需 pandas 或 numpy）
+- **部署**：純靜態檔案，可部署至任何 Web 伺服器或 CDN
 
 ## 📄 License
 MIT
